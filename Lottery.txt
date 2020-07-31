@@ -1,0 +1,289 @@
+//===== rAthena Scripts ======================================
+//= Lottery
+//===== By: ==================================================
+//= Patskie
+//===== Current Version: =====================================
+//= 1.0
+//===== Changelog: ===========================================
+//= 1.0 - Initial version
+//===== Topic: ===============================================
+//= https://rathena.org/board/topic/125261-help-making-3-number-lottery/
+//============================================================
+
+prontera,130,215,5	script	Lottery	76,{
+	function ShowNumbers;
+	function GenerateNumbers;
+	function MatchCount;
+	function GenerateID;
+	
+	function GenerateID {
+		$LWID = $LID;
+		$LID = rand(100000, 999999);
+		return;
+	}
+	
+	function MatchCount {
+		.@cnt = 0;
+		
+		for (.@i = 0; .@i < .combinations; .@i++) {
+			if (inarray($LW, #LW[.@i]) != -1)
+				.@cnt++;
+		}
+		
+		return .@cnt;
+	}
+	
+	function ShowNumbers {
+		switch (getarg(0)) {
+			default:
+			case 0:
+				.@color$ = "^FF0000";
+				.@prefix$ = "#LW";
+				break;
+			case 1:
+				.@color$ = "^0000FF";
+				.@prefix$ = "$LW";
+				break;
+			case 2:
+				.@color$ = "^006600";
+				.@prefix$ = "$LR";
+				break;
+		}
+		
+		if (getarg(1, 0))
+			.@color$ = "";
+	
+		.@mes$ = .@color$;
+			for (.@i = 0; .@i < .combinations; .@i++)
+				.@mes$ = .@mes$ + "[" + getd(.@prefix$+"["+.@i+"]") + "] ";
+		
+		if (!getarg(1, 0))
+			.@mes$ = .@mes$ + "^000000";
+			
+		return .@mes$;
+	}
+	
+	function GenerateNumbers {
+		.@a = 0;
+		deletearray getarg(0);
+		while (.@a < .combinations) {
+			do {
+				.@i = rand(1, 40);
+			} while (inarray(getarg(0), .@i) != -1);
+			set getelementofarray(getarg(0), .@a), .@i;
+			.@a++;
+		}
+		return;
+	}
+
+	mes .npc$;
+	mes "Winning Lotto Numbers ("+$LWID+"):";
+	mes ShowNumbers(1, 0);
+	mes "Your Ticket ("+#LID+"):";
+	mes ShowNumbers(0, 0);
+	mes "Next Draw-ID: ^FF0000" + $LID + "^000000.";
+	next;
+	switch(select((#LID == $LWID ? "Claim Prize" : ""), "Buy New Ticket", 
+			(getgmlevel() < .gm_level ? "" : "^FF0000[GM]^000000 Do Draw Now"), 
+			(getgmlevel() < .gm_level ? "" : "^FF0000[GM]^000000 Rig the Lottery"), "Cancel")) {
+		default: break;
+		
+		// Claim Prize
+		case 1:
+			.@match_count = MatchCount();
+			
+			if (.@match_count != .combinations) {
+				mes .npc$;
+				mes "Bad luck, it appears you do not hold a winning ticket.";
+				next;
+				mes .npc$;
+				mes "Better luck next time!.";
+				close;
+			}
+			
+			mes .npc$;
+			mes "You have matched all " + .combinations + " numbers!";
+			mes "Jackpot!";
+			mes "You've won ^0000FF" + F_InsertComma(.jackpot_zeny) + "^000000z & " + .jackpot_items[1] + " " + getitemname(.jackpot_items[0]) + "!";
+			Zeny = (Zeny + .jackpot_zeny) > 2147483647 ? 2147483647 : (Zeny + .jackpot_zeny);
+			getitem .jackpot_items[0], .jackpot_items[1];
+			announce "Lottery: " + strcharinfo(0) + " has won the JACKPOT of " + F_InsertComma(.jackpot_zeny) + "z & " + .jackpot_items[1] + " " + getitemname(.jackpot_items[0]) + "!", 0;
+			#LID = 0;
+			
+			break;
+		
+		// Buy New Ticket
+		case 2:
+			if (#LW && #LID == $LID) {
+				mes .npc$;
+				mes "It appears that you already have a ticket for today.";
+				mes "You may only purchase one ticket per draw.";
+				close;
+			}
+			mes .npc$;
+			mes "Tickets cost ^0000FF" + F_InsertComma(.ticket_price) + "^000000z.";
+			mes "The Jackpot is ^FF0000" + F_InsertComma(.jackpot_zeny) + "^000000z & " + .jackpot_items[1] + " " + getitemname(.jackpot_items[0]) + "!";
+			next;
+			
+			if (Zeny < .ticket_price) {
+				mes .npc$;
+				mes "You can't afford a lottery ticket.";
+				close;
+			}	
+			
+			mes .npc$;
+			mes "Would you like your numbers hand picked or computer generated?";
+			next;
+			switch(select("Computer Generated", "Hand Picked")) {
+				case 1:
+					while (true) {
+						mes .npc$;
+						mes "The computer has selected the following numbers:";
+						GenerateNumbers(#LW);
+						mes ShowNumbers(0, 0);
+						next;
+						if (select("Re-Generate", "Confirm") & 2) break;
+					}
+					break;
+				case 2:
+					while (true) {
+						mes .npc$;
+						mes "Please pick your numbers (1-40):";
+						.@a = 0;
+						.@j = 0;
+						deletearray #LW;
+						while (.@a < .combinations) {
+							
+							if (getarraysize(#LW)) {
+								mes "PICK " + .@a + ": ^0000FF" + #LW[.@j] + "^000000";
+								.@j++;
+							}
+						
+							do {
+								input @pick;
+							} while (@pick < 1 || @pick > 40 || inarray(#LW, @pick) != -1);
+							
+							#LW[getarraysize(#LW)] = @pick;
+							
+							.@a++;
+						}
+						
+						mes "PICK " + .@a + ": ^0000FF" + #LW[.@j] + "^000000";
+						next;
+						mes .npc$;
+						mes "Your numbers are:";
+						mes ShowNumbers(0, 0);
+						next;
+						if (select("Confirm", "Re-Pick") == 1) break;
+					}
+					break;
+			}
+			
+			Zeny -= .ticket_price;
+			#LID = $LID;
+			mes .npc$;
+			mes "The live broadcasted draw is at 9pm.";
+			mes "You can claim your ticket between then and the next draw.";
+			next;
+			mes .npc$;
+			mes "Good luck!";
+			
+			break;
+		
+		// Do Draw Now
+		case 3:
+			deletearray $LW;
+			if (!$LR)
+				GenerateNumbers($LW);
+			else
+				copyarray $LW, $LR, getarraysize($LR);
+			close2;
+			announce "Lottery: Welcome to the special GM's lotto draw!", 0;
+			sleep 3000;
+			announce "The numbers are as follows: " + ShowNumbers(1, 1), 0;
+			sleep 3000;
+			announce "Congratulations to the winners!", 0;
+			GenerateID();
+			deletearray $LR;
+			end;
+		
+		// Rig the Lottery
+		case 4:
+			while (true) {
+				mes .npc$;
+				mes "Please pick your numbers (1-40):";
+				.@a = 0;
+				.@j = 0;
+				deletearray $LR;
+				while (.@a < .combinations) {
+					
+					if (getarraysize($LR)) {
+						mes "PICK " + .@a + ": ^0000FF" + $LR[.@j] + "^000000";
+						.@j++;
+					}
+				
+					do {
+						input @pick;
+					} while (@pick < 1 || @pick > 40 || inarray($LR, @pick) != -1);
+					
+					$LR[getarraysize($LR)] = @pick;
+					
+					.@a++;
+				}
+				
+				mes "PICK " + .@a + ": ^0000FF" + $LR[.@j] + "^000000";
+				next;
+				mes .npc$;
+				mes "Your rigged numbers are:";
+				mes ShowNumbers(2, 0);
+				next;
+				if (select("Confirm", "Re-Pick") == 1) break;
+			}
+			
+			mes .npc$;
+			mes "Lottery rigged for next draw.";
+			break;
+	}
+	close;
+	
+	// Automatic Draw
+	OnClock0200:
+	OnClock0400:
+	OnClock0600:
+	OnClock0800:
+	OnClock1000:
+	OnClock1200:
+	OnClock1600:
+	OnClock1800:
+	OnClock2000:
+	OnClock2006:
+	OnClock2007:
+	OnClock2200:
+		deletearray $LW;
+		if (!$LR)
+			GenerateNumbers($LW);
+		else
+			copyarray $LW, $LR, getarraysize($LR);
+		announce "Lottery: This hour's draw is worth " + F_InsertComma(.jackpot_zeny) + " Zeny and " + .jackpot_items[1] + " " + getitemname(.jackpot_items[0]) + "!!", 0;
+		sleep 3000;
+		announce "The numbers are as follows: " + ShowNumbers(1, 1), 0;
+		sleep 3000;
+		announce "Congratulations to the winners of tonight!", 0;
+		GenerateID();
+		deletearray $LR;
+		end;
+
+	OnInit:
+		.npc$ 						= "[Lottery]";
+		.gm_level 					= 99;
+		.combinations				= 3;
+		.ticket_price				= 100000;
+		.jackpot_zeny 				= 2000000000;
+		setarray .jackpot_items[0], 501, 20;
+		
+		if (!$LID)
+			GenerateID();
+		
+		waitingroom "Hourly Lottery",0;
+		end;
+}

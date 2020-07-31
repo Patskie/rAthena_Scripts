@@ -1,0 +1,33 @@
+//===== rAthena Scripts ======================================
+//= Item Shower
+//===== By: ==================================================
+//= Patskie
+//===== Current Version: =====================================
+//= 1.0
+//===== Changelog: ===========================================
+//= 1.0 - Initial version
+//============================================================
+
+-	script	Item_Shower#main	-1,{
+	OnInit:
+		.amount = 40; // amount of item to shower
+		.item_id = 7227; // item id to shower
+		.map$ = "prontera"; // map to shower
+		bindatcmd "itemshower", "Item_Shower#main::OnItemShower", 99, 99;
+		end;
+		
+	OnItemShower:
+	OnMinute00:
+		while (.@i < .amount) {
+			do {
+				.@x = rand(1,500);
+				.@y = rand(1,500);
+			} while (!checkcell(.map$,.@x,.@y,cell_chkpass));
+			makeitem .item_id, 1, .map$, .@x, .@y;
+			.@i++;
+		}
+		
+		announce "[Item Shower] " + .amount + "x " + getitemname(.item_id) + " is all over " + .map$ + "!!!", bc_all;
+		
+		end;
+}

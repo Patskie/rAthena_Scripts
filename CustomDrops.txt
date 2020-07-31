@@ -1,0 +1,46 @@
+//===== rAthena Scripts ======================================
+//= Custom Drops
+//===== By: ==================================================
+//= Patskie
+//===== Current Version: =====================================
+//= 1.0
+//===== Changelog: ===========================================
+//= 1.0 - Initial version
+//===== Topic: ===============================================
+//= https://rathena.org/board/topic/125278-r-specific-global-item-drop/
+//============================================================
+
+// 1. Go to your src/map/script.cpp
+// 2. Add below code before "case BL_PC:	//Get Character Position"
+// case BL_MOB:
+//	if (script_hasdata(st,6)) 
+//		bl = map_id2bl(script_getnum(st,6));
+//	break;
+// 3. Recompile your server
+// 4. Add below script
+
+-	script	CustomDrop	FAKE_NPC,{
+	OnNPCKillEvent:
+		for (.@i = 0; .@i < .size; .@i += 4) {
+			if (killedrid == .data[.@i]) {
+				if (rand(10000) < .data[.@i + 3]) {
+					getmapxy .@map$, .@x, .@y, BL_MOB, killedgid;
+					.@amt = .data[.@i + 2];
+					while (.@amt) {
+						makeitem .data[.@i + 1], 1, .@map$, .@x, .@y;
+						.@amt--;
+					}
+				}
+			}
+		}
+		end;
+		
+	OnInit:
+		// <mob_id>, <item_id>, <item_amount>, <chance>
+		setarray .data[0], 
+			1002, 607, 2, 10000, // poring will drop 2 ygg berries on the floor with 100% chance
+			1002, 608, 3, 10000; // poring will drop 3 ygg seeds on the floor with 100% chance
+		
+		.size = getarraysize(.data);
+		end;
+}

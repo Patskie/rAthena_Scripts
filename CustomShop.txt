@@ -1,0 +1,96 @@
+//===== rAthena Scripts ======================================
+//= Custom Shop
+//===== By: ==================================================
+//= Patskie
+//===== Current Version: =====================================
+//= 1.0
+//===== Changelog: ===========================================
+//= 1.0 - Initial version
+//============================================================
+
+prontera,150,150,6	script	Custom Shop	443,{
+	function Add;
+	mes .npc$;
+	mes "Which shop do you want to check?";
+	mes " ";
+	mes "^FF0000To avoid issues with item purchases. Please select one item at a time^000000.";
+	next;
+	@s = select(implode(.Menu$, ":"));
+	callshop "pshop"+@s, 1;
+	npcshopattach "pshop"+@s;
+	end;
+	
+	OnBuyItem:
+		@bs = getarraysize(@bought_nameid);
+		mes .npc$;
+		for (.@j = 0; .@j < getd(".i"+@s); .@j += 2) {
+			for (.@k = 0; .@k < @bs; .@k++) {
+				if (@bought_nameid[.@k] == getd(".Item"+@s+"["+.@j+"]")) {
+					if (checkweight(@bought_nameid[.@k], @bought_quantity[.@k])) {
+						if (getd(.currency$) < getd(".Item"+@s+"["+(.@j+1)+"]") || getd(.currency$) < ((getd(".Item"+@s+"["+(.@j+1)+"]"))*@bought_quantity[.@k])) {
+                            mes "You don't have enough points to purchase below item";
+							mes "Item: " + @bought_quantity[.@k] + "x ^FF8000" + getitemname(@bought_nameid[.@k]) + "^000000";
+							mes "Price: ^FF8000" + F_InsertComma((getd(".Item"+@s+"["+(.@j+1)+"]"))*@bought_quantity[.@k]) + "^000000 points";
+							mes "Onhand: ^FF8000" + F_InsertComma(getd(.currency$)) + "^000000 points";
+							break;
+                        } else {
+							setd(.currency$), getd(.currency$) - getd(".Item"+@s+"["+(.@j+1)+"]") * @bought_quantity[.@k];
+                            getitem @bought_nameid[.@k], @bought_quantity[.@k];
+                        }
+					} else {
+						mes "You cannot carry out " + @bought_quantity[.@k] + "x ^FF8000" + getitemname(@bought_nameid[.@k]) + "^000000 with you upon purchase. Please clean up some of your items and re-try again.";
+						break;
+					}
+				}
+			}
+		}
+		deletearray @bought_quantity, getarraysize(@bought_quantity);
+        deletearray @bought_nameid, @bs;
+		end;
+
+	function Add {
+		.@sn$ = "pshop" + getarg(0);
+		copyarray .@d, getarg(1), getarraysize(getarg(1));
+		.@s = getarraysize(.@d);
+		npcshopdelitem .@sn$, 501;
+		for (.@i = 0; .@i < .@s; .@i += 2)
+			npcshopadditem .@sn$, .@d[.@i], .@d[.@i+1];
+		return;
+	}
+	
+	OnInit:
+		.npc$ = "[ ^0000FF" + strnpcinfo(1) + "^000000 ]";
+		.currency$ = "#CASHPOINTS";
+		
+		setarray .Menu$[0], "Upper Headgear", "Middle Headgear", "Lower Headgear";
+		setarray .Item1[0],
+			5137, 3500,
+			5138, 3500,
+			5372, 3500,
+			5374, 3500,
+			5801, 3500;
+		
+		setarray .Item2[0],
+			5135, 1200,
+			5325, 1200,
+			5421, 1200,
+			5800, 1200;
+		
+		setarray .Item3[0],
+			5377, 1200,
+			5462, 1200;
+		
+		.i1 = getarraysize(.Item1);
+		.i2 = getarraysize(.Item2);
+		.i3 = getarraysize(.Item3);
+		
+		Add(1, .Item1);
+		Add(2, .Item2);
+		Add(3, .Item3);
+		
+		end;
+}
+
+-	shop	pshop1	-1,501:50
+-	shop	pshop2	-1,501:50
+-	shop	pshop3	-1,501:50
