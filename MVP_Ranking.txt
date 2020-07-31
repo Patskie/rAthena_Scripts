@@ -1,0 +1,248 @@
+//===== rAthena Scripts ======================================
+//= MVP Ranking
+//===== By: ==================================================
+//= Patskie
+//===== Current Version: =====================================
+//= 1.0
+//===== Changelog: ===========================================
+//= 1.0 - Initial version
+//===== Description: =========================================
+//= Casual MVP ranking but only counts on official MVP maps
+//============================================================
+
+prontera,150,150,6	script	MVP Ranking	402,{
+	.@top = getvariableofnpc(.top_x, "MVPRanking_PT");
+	.@npc$ = "[ MVP Ranking ]";
+	mes .@npc$;
+	mes "Hello " + strcharinfo(0) + ", What do you wish to check?";
+	next;
+	switch(select("Top " + .@top + " players", "Information", "Rewards", "Cancel")) {
+		default: break;
+		
+		case 1:
+			query_sql("SELECT COUNT(1) FROM `pt_mvp_rank`", .@cnt);
+			mes .@npc$;
+			if (!.@cnt)
+				mes "There is no ranking data at the moment. Mind killing MVP? :)";
+			else {
+				.@s = query_sql("SELECT `name`, `kills` FROM `pt_mvp_rank` ORDER BY `kills` DESC LIMIT " + .@top, .@name$, .@kills);
+				mes "Please see below top " + .@top + " mvp ranks!";
+				for (.@i = 0; .@i < .@s; .@i++)
+					mes (.@i+1) + ". ^FF0000" + .@name$[.@i] + "^000000 | Kills:^0000FF" + .@kills[.@i] + "^000000";
+			}
+			break;
+			
+		case 2:
+			mes .@npc$;
+			mes "The MVP ranking system is a server unique feature wherein players can rank themselves among others when it comes to MVP kills" +
+				". The rules is simple, each players will be ranked ^FF0000whenever they kill MVP's on their own actual territory^000000.";
+			mes " ";
+			mes "If for instance, you kill ^FF8000Osiris^000000 on ^0000FFprontera^000000 then the system will not count it as 1 point because we all know that Osiris resides in ^006600morocc^000000.";
+			break;
+		
+		case 3:
+			mes .@npc$;
+			mes "Every month the MVP ranking will reset to give way to other players. During the reset, " +
+				"our system will give rewards to top " + .@top + " players through RODEX mail.";
+			mes " ";
+			mes "The prize for the first top " + .@top + " are as follows:";
+			// Top 1
+			for (.@i = 1; .@i <= .@top; .@i++) {
+				.@size = getarraysize(getvariableofnpc(getd(".award_itm_" + .@i), "MVPRanking_PT"));
+				mes " ";
+				mes "Top (" + .@i + ")";
+				for (.@j = 0; .@j < .@size; .@j++) {
+					.@item_id = getvariableofnpc(getd(".award_itm_" + .@i + "[" + .@j + "]"), "MVPRanking_PT");
+					.@item_am = getvariableofnpc(getd(".award_amt_" + .@i + "[" + .@j + "]"), "MVPRanking_PT");
+					mes (.@j+1) + ". " + .@item_am + "x " + getitemname(.@item_id);
+				}
+			}
+			break;
+		
+	}
+	close;
+}
+
+-	script	MVPRanking_PT	-1,{
+	function UpdateRank;
+	function GiveRewards;
+	
+	function GiveRewards {
+		.@cid = getarg(0);
+		.@sender$ = getarg(1);
+		.@title$ = getarg(2);
+		.@body$ = getarg(3);
+		.@zeny = getarg(4);
+		copyarray .@item_data, getarg(5), getarraysize(getarg(5));
+		copyarray .@amount_data, getarg(6), getarraysize(getarg(6));
+		
+		mail .@cid, .@sender$, .@title$, .@body$, .@zeny, .@item_data, .@amount_data;
+
+		return;
+	}
+	
+	function UpdateRank {
+		.@cid = getarg(0);
+		.@aid = getarg(1);
+		.@cn$ = getarg(2);
+		
+		query_sql("SELECT COUNT(1) FROM `pt_mvp_rank` WHERE `char_id` = " + .@cid, .@cnt);
+		
+		if (!.@cnt)
+			query_sql(sprintf("INSERT INTO `pt_mvp_rank` (`char_id`, `account_id`, `name`, `kills`) VALUES (%d, %d, '%s', 1)", .@cid, .@aid, .@cn$));
+		else
+			query_sql(sprintf("UPDATE `pt_mvp_rank` SET `kills` = `kills` + 1 WHERE `char_id` = %d", .@cid));
+		
+		return;
+	}
+	
+	// Reset the ranking if any GM triggers @mvpreset
+	OnReset:
+		if (.reset_toggle)
+			announce "MVP Ranking has been reset!", bc_all, 0x80FF00, FW_NORMAL, 24;
+
+		if (.award_toggle) {
+			query_sql("SELECT COUNT(1) FROM `pt_mvp_rank`", .@cnt);
+
+			if (.@cnt) {
+				.@s = query_sql("SELECT `char_id` FROM `pt_mvp_rank` ORDER BY `kills` DESC LIMIT " + .top_x, .@cid);
+				for (.@i = 0; .@i < .@s; .@i++)
+					GiveRewards(.@cid[.@i], .sender_name$, .title$, .body$, .zeny_award, getd(".award_itm_" + (.@i+1)), getd(".award_amt_" + (.@i+1)));
+			}
+		}
+		
+		query_sql("TRUNCATE TABLE `pt_mvp_rank`");
+		end;
+	
+	// Reset the ranking every month
+	OnClock0000:
+		if (gettime(DT_DAYOFMONTH) != 1) end;
+	
+		if (.reset_toggle)
+			announce "MVP Ranking has been reset!", bc_all, 0x80FF00, FW_NORMAL, 24;
+
+		if (.award_toggle) {
+			query_sql("SELECT COUNT(1) FROM `pt_mvp_rank`", .@cnt);
+
+			if (.@cnt) {
+				.@s = query_sql("SELECT `char_id` FROM `pt_mvp_rank` ORDER BY `kills` DESC LIMIT " + .top_x, .@cid);
+				for (.@i = 0; .@i < .@s; .@i++)
+					GiveRewards(.@cid[.@i], .sender_name$, .title$, .body$, .zeny_award, getd(".award_itm_" + (.@i+1)), getd(".award_amt_" + (.@i+1)));
+			}
+		}
+		
+		query_sql("TRUNCATE TABLE `pt_mvp_rank`");
+		end;
+
+	OnNPCKillEvent:
+		.@index = inarray(.MVP$, "" + killedrid + "");
+		
+		if (.@index == -1) end;
+		
+		.@is_ok = false;
+		.@maps$ = .MVP$[.@index+1];
+		
+		if (.@maps$ == "NA") end;
+		
+		if (!compare(.@maps$, "|")) {
+			if (strcharinfo(3) == .@maps$)
+				.@is_ok = true;
+		} else {
+			explode(.@map_data$, .@maps$, "|");
+			.@size = getarraysize(.@map_data$);
+			for (.@i = 0; .@i < .@size; .@i++) {
+				if (strcharinfo(3) == .@map_data$[.@i]) {
+					.@is_ok = true;
+					break;
+				}
+			}
+		}
+		
+		if (.@is_ok) {
+			if (.announce_toggle)
+				announce "[ " + strcharinfo(0) + " ] has mutilated " + getmonsterinfo(killedrid, MOB_NAME) + " !!! What a guy !~", bc_all, 0xFFFFFF, FW_NORMAL, 24;
+			UpdateRank(getcharid(0), getcharid(3), strcharinfo(0));
+		}
+		end;
+	
+	OnInit:
+		bindatcmd "mvpreset", strnpcinfo(1) + "::OnReset", 99, 99;  // @mvpreset to manually reset the ladder
+																	// only works with GM
+	
+		// CONFIGURATION
+		.reset_toggle 				= 1;					// 1 = enable announce upon reset | 0 = disable announce upon reset
+		.announce_toggle 			= 1; 					// 1 = enable announce upon kill | 0 = disable announce upon kill
+		.top_x 						= 3;					// Top X who will receive the awards?
+		
+		// AWARD RELATED
+		.award_toggle 				= 1; 					// 1 = give award | 0 = don't give awards
+		.zeny_award 				= 5000;					// zeny award, put 0 to disable
+		setarray .award_itm_1[0],	607, 608, 501; 			// item id award for top 1 (max 5 items)
+		setarray .award_amt_1[0],	100, 100, 100;			// item amount award for top 1 (max 5 items)
+		setarray .award_itm_2[0],	607, 608; 				// item id award for top 2 (max 5 items) 
+		setarray .award_amt_2[0],	 50,  50;				// item amount award for top 2 (max 5 items)
+		setarray .award_itm_3[0],	607, 608; 				// item id award for top 3 (max 5 items)
+		setarray .award_amt_3[0],	 30,  30;				// item amount award for top 3 (max 5 items)
+		
+		// MAIL RELATED
+		.sender_name$ 				= "[GM] Patskie";
+		.title$						= "[" + gettime(DT_MONTH) + "/" + gettime(DT_DAYOFMONTH) + "/" + gettime(DT_YEAR) + "] MVP Ranking Reward";
+		.body$						= "Congratulations on being one our top " + .top_x + " players on MVP ranking. "
+									+ "Keep up the good work! As we give appreciation to you, please accept the attached rewards for your dedication.";
+	
+		// DO NOT TOUCH BELOW
+		query_sql("CREATE TABLE IF NOT EXISTS `pt_mvp_rank` (`char_id` INT, `account_id` INT, `name` VARCHAR(30), `kills` INT)");
+		setarray .MVP$[0],
+			"1038", "moc_pryd04",
+			"1039", "prt_maze03", 
+			"1046", "gef_dun02|gld_dun02",
+			"1059", "mjolnir_04",
+			"1086", "prt_sewb4",
+			"1087", "gef_fild02|get_fild14",
+			"1112", "treasure02",
+			"1115", "gld_dun01|pay_fild11",
+			"1147", "anthell02|gld_dun03",
+			"1150", "pay_dun04",
+			"1157", "in_sphinx5",
+			"1159", "moc_fild17",
+			"1190", "gef_fild10",
+			"1251", "xmas_dun02",
+			"1252", "xmas_fild01",
+			"1272", "gl_chyard|gld_dun04",
+			"1312", "tur_dun04",
+			"1373", "NA",
+			"1389", "gef_dun01",
+			"1399", "NA",
+			"1418", "gon_dun03",
+			"1492", "ama_dun03",
+			"1502", "NA",
+			"1511", "moc_pryd06",
+			"1583", "beach_dun",
+			"1623", "ein_dun02",
+			"1630", "lou_dun03",
+			"1646", "NA",
+			"1647", "NA",
+			"1648", "NA",
+			"1649", "NA",
+			"1650", "NA",
+			"1651", "NA",
+			"1658", "lhz_dun02",
+			"1685", "jupe_core",
+			"1688", "ayo_dun02",
+			"1708", "NA",
+			"1719", "abyss_03",
+			"1734", "kh_dun02",
+			"1751", "odin_tem03",
+			"1768", "ra_san05",
+			"1779", "NA",
+			"1785", "ra_fild02|ra_fild03|ra_fild04|ve_fild01|ve_fild02",
+			"1832", "thor_v03",
+			"1871", "abbey02",
+			"1874", "NA",
+			"1885", "mosk_dun03",
+			"1917", "moc_fild22",
+			"1980", "NA",
+			"2022", "NA",
+			"2068", "NA";
+		end;
+}
